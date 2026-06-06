@@ -9,7 +9,9 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFile = (file: File) => {
-    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+    const supportedExts = ['.txt', '.md', '.doc', '.docx', '.pdf'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (file.type === 'text/plain' || supportedExts.includes(ext)) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
@@ -17,7 +19,7 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
       };
       reader.readAsText(file);
     } else {
-      alert('请上传 .txt 格式的文本文件');
+      alert('请上传 .txt, .md, .doc, .docx 格式的文本文件');
     }
   };
 
@@ -46,10 +48,10 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
       <h3 className="text-lg font-semibold text-gray-700 mb-2">
         拖拽小说文件到这里
       </h3>
-      <p className="text-sm text-gray-500 mb-4">支持 .txt 格式</p>
+      <p className="text-sm text-gray-500 mb-4">支持 .txt, .md, .doc, .docx 格式</p>
       <label className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition">
         选择文件
-        <input type="file" accept=".txt" className="hidden" onChange={handleInputChange} />
+        <input type="file" accept=".txt,.md,.doc,.docx,.pdf" className="hidden" onChange={handleInputChange} />
       </label>
     </div>
   );

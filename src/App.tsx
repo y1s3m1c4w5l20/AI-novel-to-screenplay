@@ -5,6 +5,7 @@ import CharacterPanel from './components/CharacterPanel';
 import SceneCard from './components/SceneCard';
 import EmotionChart from './components/EmotionChart';
 import ConflictGraph from './components/ConflictGraph';
+import yaml from 'js-yaml';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -49,10 +50,8 @@ function App() {
       console.log('收到 YAML:', yamlText.substring(0, 200));
 
       // 2. 调用 /analyze 分析剧本
-      const analyzeRes = await fetch(`${API_BASE}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ 'yaml_text': yamlText })
+      const analyzeRes = await fetch(`${API_BASE}/analyze?yaml_text=${encodeURIComponent(yamlText)}`, {
+        method: 'POST'
       });
       
       let analysisData = null;
@@ -75,50 +74,80 @@ function App() {
   };
 
   // 解析后端数据为前端展示格式
-  const parseData = (yaml: string, analysisData: any): any => {
-    return {
-      metadata: { title: "AI 生成剧本", source_title: "上传的小说", total_scenes: 3 },
-      characters: analysisData?.角色戏份平衡?.map((c: any, i: number) => ({
-        id: `char_${i+1}`,
-        name: c.角色,
-        type: i === 0 ? "protagonist" : "supporting",
-        description: c.诊断,
-        dialogue_count: Math.round(c.出场次数 * 2),
-        scenes_appearing: ["scene_001", "scene_002"]
-      })) || [
-        { id: "char_001", name: "主角", type: "protagonist", description: "主角", dialogue_count: 10, scenes_appearing: ["scene_001"] }
-      ],
-      scenes: analysisData?.情绪曲线数据?.map((item: any, i: number) => ({
-        id: `scene_${i+1}`,
-        scene_number: item.场景编号,
-        heading: { int_ext: "INT", location: item.场景摘要?.substring(0, 10) || "未知地点", time_of_day: "DAY" },
-        content: {
-          synopsis: item.场景摘要 || "场景描述",
-          estimated_duration: 2.0,
-          characters_present: ["主角"],
-          beats: [{
-            beat_number: 1,
-            type: "action",
-            content: "场景动作",
-            action: { text: "场景动作描述", camera_suggestion: "镜头建议" }
-          }]
+  const parseData = (yamlText: string, analysisData: any): any => {
+    try {
+      // 真正解析 YAML
+      const data = yaml.load(yamlText) as any;
+      
+      return {
+        metadata: {
+          title: data?.元信息?.标题 || "AI 生成剧本",
+          source_title: data?.元信息?.原作品标题 || "上传的小说",
+          total_scenes: data?.场景序列?.length || 0
         },
-        ai_analysis: {
-          dramatic_tension: item.戏剧张力 || 5,
-          emotional_tone: item.情绪基调 || "未知",
-          pacing_suggestion: "节奏建议"
+        characters: data?.角色库?.map((c: any, i: number) => {
+          // 从场景序列中找出该角色出场的场景编号
+          const appearingScenes = data?.场景序列
+            ?.filter((s: any) => s.在场角色?.includes(c.编号))
+            ?.map((s: any) => s.编号 || `scene_${s.场景序号}`) || [];
+          
+          return {
+            id: c.编号 || `char_${i}`,
+            name: c.姓名 || "未知角色",
+            type: c.类型 === 'protagonist' ? 'protagonist' : 'supporting',
+            description: c.简介 || "",
+            dialogue_count: Math.round((appearingScenes.length || 1) * 2),
+            scenes_appearing: appearingScenes.length > 0 ? appearingScenes : [`scene_001`]
+          };
+        }) || [],
+        scenes: data?.场景序列?.map((s: any, i: number) => ({
+          id: s.编号 || `scene_${i}`,
+          scene_number: s.场景序号 || i + 1,
+          heading: {
+            int_ext: s.地点?.includes("内") ? "INT" : "EXT",
+            location: s.地点 || "未知地点",
+            time_of_day: s.时间 || "DAY"
+          },
+          content: {
+            synopsis: s.摘要 || "场景描述",
+            estimated_duration: s.预估时长 || 2.0,
+            characters_present: s.在场角色 || [],
+            beats: s.节拍?.map((b: any, j: number) => ({
+              beat_number: j + 1,
+              type: b.类型 || "action",
+              content: b.内容 || "",
+              action: {
+                text: b.内容 || "",
+                camera_suggestion: b.镜头建议 || ""
+              }
+            })) || []
+          },
+          ai_analysis: {
+            dramatic_tension: s.戏剧张力 || 5,
+            emotional_tone: s.情绪基调 || "未知",
+            pacing_suggestion: "节奏建议"
+          }
+        })) || [],
+        structure: {
+          emotional_arc: data?.场景序列?.map((s: any) => ({
+            scene_id: s.编号 || "",
+            scene_number: s.场景序号 || 0,
+            valence: (s.戏剧张力 || 5) > 5 ? -0.5 : 0.3,
+            arousal: (s.戏剧张力 || 5) / 10,
+            dramatic_tension: s.戏剧张力 || 5
+          })) || []
         }
-      })) || [],
-      structure: {
-        emotional_arc: analysisData?.情绪曲线数据?.map((item: any) => ({
-          scene_id: `scene_${item.场景编号}`,
-          scene_number: item.场景编号,
-          valence: item.戏剧张力 > 5 ? -0.5 : 0.3,
-          arousal: item.戏剧张力 / 10,
-          dramatic_tension: item.戏剧张力
-        })) || []
-      }
-    };
+      };
+    } catch (err) {
+      console.error('YAML 解析失败:', err);
+      // 解析失败时返回空结构
+      return {
+        metadata: { title: "解析失败", total_scenes: 0 },
+        characters: [],
+        scenes: [],
+        structure: { emotional_arc: [] }
+      };
+    }
   };
 
   const exportYAML = () => {
@@ -131,6 +160,39 @@ function App() {
     a.download = 'screenplay.yaml';
     a.click();
   };
+  // 重新上传（清空当前数据）
+  const handleReset = () => {
+    setScreenplay(null);
+    setAnalysis(null);
+    setActiveTab('scenes');
+    setError(null);
+    localStorage.removeItem('screenplay_data');
+    localStorage.removeItem('analysis_data');
+  };
+
+  // 保存到 localStorage（刷新不丢失）
+  useEffect(() => {
+    if (screenplay) {
+      localStorage.setItem('screenplay_data', JSON.stringify(screenplay));
+      localStorage.setItem('analysis_data', JSON.stringify(analysis));
+    }
+  }, [screenplay, analysis]);
+
+  // 页面刷新时恢复数据
+  useEffect(() => {
+    const savedScreenplay = localStorage.getItem('screenplay_data');
+    const savedAnalysis = localStorage.getItem('analysis_data');
+    if (savedScreenplay) {
+      try {
+        setScreenplay(JSON.parse(savedScreenplay));
+        if (savedAnalysis) {
+          setAnalysis(JSON.parse(savedAnalysis));
+        }
+      } catch (e) {
+        console.error('恢复数据失败:', e);
+      }
+    }
+  }, []);
 
   const getConflictEdges = () => {
     if (!analysis?.角色冲突热力图) return [];
@@ -166,9 +228,14 @@ function App() {
             </div>
           </div>
           {screenplay && (
-            <button onClick={exportYAML} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-              <Download className="w-4 h-4" /> 导出 YAML
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                <span>↻</span> 重新上传
+              </button>
+              <button onClick={exportYAML} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                <Download className="w-4 h-4" /> 导出 YAML
+              </button>
+            </div>
           )}
         </div>
       </header>
