@@ -35,6 +35,7 @@ class NovelParser:
         if current_chunk:
             chunks.append('\n\n'.join(current_chunk))
 
+        # 确保返回 Tuple[str, str] 格式
         return [(f"Chapter_{i + 1}", chunk) for i, chunk in enumerate(chunks)]
 
     def extract_characters(self, text: str) -> List[dict]:

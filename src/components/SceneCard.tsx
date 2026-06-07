@@ -42,7 +42,11 @@ interface SceneCardProps {
 }
 
 // 可编辑文本组件
-function EditableText({ text, onSave, className = "" }: { text: string; onSave: (newText: string) => void; className?: string }) {
+function EditableText({ text, onSave, className = "" }: { 
+  text: string; 
+  onSave: (newText: string) => void; 
+  className?: string 
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(text);
 
@@ -78,12 +82,9 @@ function EditableText({ text, onSave, className = "" }: { text: string; onSave: 
   }
 
   return (
-    <div 
-      className={`cursor-pointer group relative ${className}`}
-      onClick={() => setIsEditing(true)}
-    >
-      <span>{text}</span>
-      <Edit2 className="w-3 h-3 inline-block ml-2 opacity-0 group-hover:opacity-50 text-gray-400" />
+    <div className={`cursor-pointer group relative ${className}`} onClick={() => setIsEditing(true)}>
+      {text}
+      <Edit2 className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 inline-block ml-1" />
     </div>
   );
 }
@@ -117,12 +118,20 @@ export default function SceneCard({ scene }: SceneCardProps) {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-blue-600">#{scene.scene_number}</span>
+            <span className="text-lg font-bold text-blue-600">{scene.scene_number}</span>
             <div>
               <div className="font-semibold text-gray-900">
                 {scene.heading.int_ext}. {scene.heading.location} - {scene.heading.time_of_day}
               </div>
-              <div className="text-sm text-gray-500">{scene.content.synopsis}</div>
+              <div className="text-sm text-gray-500">
+                {scene.content.synopsis?.includes('AI生成失败') ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-1">
+                    <span className="text-yellow-700 text-xs">⚠️ AI生成失败，建议重新上传或使用 .txt 格式</span>
+                  </div>
+                ) : (
+                  scene.content.synopsis
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -130,8 +139,17 @@ export default function SceneCard({ scene }: SceneCardProps) {
               <Clock className="w-4 h-4" />
               <span>{scene.content.estimated_duration}min</span>
             </div>
-            <div className={`w-8 h-8 rounded-full ${getTensionColor(scene.ai_analysis.dramatic_tension)} flex items-center justify-center text-white text-xs font-bold`}>
-              {scene.ai_analysis.dramatic_tension}
+            <div className="flex items-center gap-2">
+              <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full ${
+                    scene.ai_analysis.dramatic_tension >= 7 ? 'bg-red-500' :
+                    scene.ai_analysis.dramatic_tension >= 4 ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${scene.ai_analysis.dramatic_tension * 10}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-gray-600">{scene.ai_analysis.dramatic_tension}/10</span>
             </div>
             {expanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
           </div>
