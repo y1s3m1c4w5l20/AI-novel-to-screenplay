@@ -1,6 +1,7 @@
 # AI 小说转剧本工具
+https://www.bilibili.com/video/BV1cYEt6FESP/?spm_id_from=333.1387.homepage.video_card.click&vd_source=f9df3cd6892e0e2ef5cf7d0d446ba2af
 
-&gt; 不只是"格式转换器"，而是 AI 编剧助手 —— 理解小说叙事逻辑，主动发现戏剧冲突，辅助创作者完成从文学到影像的思维跃迁。
+不只是"格式转换器"，而是 AI 编剧助手 —— 理解小说叙事逻辑，主动发现戏剧冲突，辅助创作者完成从文学到影像的思维跃迁。
 
 ## 核心功能
 
@@ -19,9 +20,12 @@
 
 ### 后端启动
     cd backend
-    pip install -r requirements.txt
-    uvicorn main:app --reload
-
+    python -m venv .venv
+    .venv\Scripts\activate
+    source .venv/bin/activate
+    pip install fastapi uvicorn sqlalchemy langchain-openai python-docx PyPDF2 ebooklib python-multipart pydantic
+    python main.py
+    
 ## 项目结构
 
 - backend/：FastAPI 后端（模型、服务、Prompt）
@@ -36,3 +40,8 @@
 ## License
 
 MIT License
+
+
+
+
+
